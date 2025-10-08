@@ -4,14 +4,44 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>盲盒歌单（纯浏览器版）</title>
-  <link rel="stylesheet" href="./style.css" />
+  <style>
+    :root { --gap: 12px; --radius: 14px; }
+    * { box-sizing: border-box; }
+    body { font-family: system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+           margin: 0; background: #0f172a; color: #e2e8f0; }
+    .wrap { max-width: 840px; margin: 0 auto; padding: 20px 14px 80px; }
+    h1 { font-size: 22px; margin: 8px 0 10px; }
+    .card { background: #111827; border: 1px solid #1f2937; border-radius: var(--radius);
+            padding: 14px; margin-top: var(--gap); }
+    label { font-size: 14px; opacity: .9; margin-bottom: 6px; display: block; }
+    input[type="text"], input[type="number"], textarea, select {
+      width: 100%; background: #0b1220; color: #e2e8f0; border: 1px solid #233044;
+      border-radius: 10px; padding: 10px; outline: none;
+    }
+    textarea { min-height: 110px; resize: vertical; }
+    .row { display: grid; grid-template-columns: 1fr; gap: var(--gap); }
+    @media (min-width: 720px) { .row-2 { grid-template-columns: 1fr 1fr; } }
+    button {
+      background: #2563eb; color: #fff; border: none; border-radius: 10px;
+      padding: 10px 14px; font-weight: 600; cursor: pointer;
+    }
+    button.secondary { background: #374151; }
+    button.warn { background: #dc2626; }
+    .muted { color: #94a3b8; font-size: 13px; }
+    .pill { display:inline-block;background:#0b1220;border:1px solid #233044;border-radius:999px;padding:4px 10px;font-size:12px;color:#9fb7d3 }
+    .flex { display:flex; gap: var(--gap); align-items: center; flex-wrap: wrap; }
+    .spacer { height: 6px; }
+    .success { color:#34d399 }
+    .hr { height:1px; background:#1f2937; margin: 10px 0; }
+    .kbd { font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;
+           background:#0b1220;border:1px solid #233044;border-radius:6px;padding:2px 6px;font-size:12px; }
+    .num { font-variant-numeric: tabular-nums; }
+  </style>
 </head>
 <body>
 <div class="wrap">
   <h1>🎵 盲盒歌单（纯浏览器版）</h1>
-  <div class="muted">
-    在手机/平板/电脑的浏览器中直接运行。添加/删除歌曲，编号 1..N 开盲盒；每次洗牌都会打乱编号→歌名映射。数据仅保存在本机浏览器。
-  </div>
+  <div class="muted">添加/删除歌曲，编号 1..N 开盲盒；每次洗牌都会打乱编号→歌名映射。数据仅保存在本机浏览器。</div>
 
   <!-- 歌曲池与控制 -->
   <div class="card">
@@ -89,21 +119,214 @@
   </div>
 </div>
 
-<!-- 使用内联 ES Module 导入，带版本参数防缓存；路径基于 index.html 所在位置 -->
-<script type="module">
-  // 如果 index.html 在仓库根目录，js/ 与之同层，保持下面这一行即可：
-  import './js/app.js?v=6';
-</script>
-
-<!-- 兜底提示（仅用于排查：模块未加载/路径错误/使用 file:// 打开时会显示） -->
+<!-- 纯原生 JS（无模块） -->
 <script>
-  setTimeout(() => {
-    if (!window.__APP_LOADED__) {
-      const el = document.getElementById('result');
-      if (el) el.textContent = '⚠️ 前端脚本未加载：请不要用 file:// 打开。请用 http 服务（如 python -m http.server）或 GitHub Pages 访问，并检查 js/app.js 路径大小写。';
-      console.warn('app.js 未设置 __APP_LOADED__，通常是模块未加载（路径/大小写/缓存/使用 file:// 打开导致）。');
+(function () {
+  "use strict";
+
+  // ---- 本地存储键 ----
+  const KEY_SONGS = "blindbox_songs";
+  const KEY_MAP   = "blindbox_mapping";
+  const KEY_TIME  = "blindbox_last_shuffle";
+
+  // 可选：首次打开时预置一些歌（不需要可设为空数组）
+  const DEFAULT_SONGS = [];
+
+  // ---- 工具 ----
+  function nowStr() {
+    const d = new Date();
+    const pad = n => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} `
+         + `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  }
+  function getLocal(key, defVal) {
+    try {
+      const v = localStorage.getItem(key);
+      return v == null ? defVal : JSON.parse(v);
+    } catch {
+      return defVal;
     }
-  }, 1200);
+  }
+  function setLocal(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
+
+  // ---- 歌曲数据 ----
+  function normalize(list) {
+    const uniq = []; const seen = new Set();
+    for (const x of list) {
+      const s = String(x).trim(); const k = s.toLowerCase();
+      if (s && !seen.has(k)) { uniq.push(s); seen.add(k); }
+    }
+    uniq.sort((a,b)=>a.toLowerCase().localeCompare(b.toLowerCase()));
+    return uniq;
+  }
+  function loadSongs() {
+    let data = getLocal(KEY_SONGS, []);
+    if ((!data || data.length === 0) && DEFAULT_SONGS.length) {
+      setLocal(KEY_SONGS, DEFAULT_SONGS);
+      data = DEFAULT_SONGS;
+    }
+    return normalize(data);
+  }
+  function saveSongs(songs) {
+    setLocal(KEY_SONGS, normalize(songs));
+    renderSongCount();
+    renderDeleteList();
+    fixOrReshuffleMapping();
+  }
+
+  // ---- 映射/洗牌 ----
+  function getMapping() { return getLocal(KEY_MAP, []); }
+  function setMapping(m) { setLocal(KEY_MAP, m); }
+  function getLastShuffle() { return getLocal(KEY_TIME, null); }
+  function setLastShuffle(s) { setLocal(KEY_TIME, s); }
+
+  function reshuffleMapping() {
+    const n = loadSongs().length;
+    const mapping = Array.from({length: n}, (_, i) => i);
+    for (let i = n - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [mapping[i], mapping[j]] = [mapping[j], mapping[i]];
+    }
+    setMapping(mapping);
+    setLastShuffle(nowStr());
+    renderMeta();
+  }
+  function fixOrReshuffleMapping() {
+    const songs = loadSongs();
+    const m = getMapping();
+    if (!m || m.length !== songs.length) reshuffleMapping();
+    else renderMeta();
+  }
+
+  // ---- 渲染 ----
+  function renderMeta() {
+    document.getElementById("song-count").innerText = String(loadSongs().length);
+    document.getElementById("last-shuffle").innerText = getLastShuffle() || "—";
+  }
+  function renderSongCount() {
+    document.getElementById("song-count").innerText = String(loadSongs().length);
+  }
+  function renderDeleteList() {
+    const sel = document.getElementById("delete-select");
+    while (sel.firstChild) sel.removeChild(sel.firstChild);
+    loadSongs().forEach((name, i) => {
+      const opt = document.createElement("option");
+      opt.value = String(i); opt.textContent = name; sel.appendChild(opt);
+    });
+  }
+  function showResult(text) {
+    document.getElementById("result").textContent = text;
+  }
+
+  // ---- 交互 ----
+  function addSingle() {
+    const inp = document.getElementById("single-title");
+    const name = (inp.value || "").trim();
+    if (!name) return;
+    const songs = loadSongs();
+    const set = new Set(songs.map(s => s.toLowerCase()));
+    if (!set.has(name.toLowerCase())) {
+      songs.push(name);
+      songs.sort((a,b)=>a.toLowerCase().localeCompare(b.toLowerCase()));
+      saveSongs(songs);
+    }
+    inp.value = "";
+  }
+  function addBulk() {
+    const ta = document.getElementById("bulk-titles");
+    const parts = (ta.value || "").split(/\n|,/).map(s => s.trim()).filter(Boolean);
+    if (!parts.length) return;
+    const songs = loadSongs();
+    const set = new Set(songs.map(s => s.toLowerCase()));
+    for (const s of parts) {
+      if (!set.has(s.toLowerCase())) { songs.push(s); set.add(s.toLowerCase()); }
+    }
+    songs.sort((a,b)=>a.toLowerCase().localeCompare(b.toLowerCase()));
+    saveSongs(songs);
+    ta.value = "";
+  }
+  function deleteSelected() {
+    const sel = document.getElementById("delete-select");
+    const idxs = Array.from(sel.selectedOptions).map(o => parseInt(o.value, 10)).sort((a,b)=>b-a);
+    if (!idxs.length) return;
+    const songs = loadSongs();
+    for (const i of idxs) {
+      if (i >=0 && i < songs.length) songs.splice(i, 1);
+    }
+    saveSongs(songs);
+  }
+  function openBoxByNumber() {
+    const val = document.getElementById("pick-number").value;
+    const n = parseInt(val, 10);
+    const songs = loadSongs();
+    if (!songs.length) { showResult("歌单为空。"); return; }
+    if (!Number.isInteger(n) || n < 1 || n > songs.length) { showResult("数字超出范围。"); return; }
+    fixOrReshuffleMapping();
+    const mapping = getMapping();
+    showResult(`🎉 你的盲盒是：${songs[mapping[n-1]]}`);
+  }
+  function openRandom() {
+    const songs = loadSongs();
+    if (!songs.length) { showResult("歌单为空。"); return; }
+    fixOrReshuffleMapping();
+    const mapping = getMapping();
+    const pick = Math.floor(Math.random() * songs.length) + 1;
+    showResult(`🎉 随机抽到：${songs[mapping[pick-1]]}（编号 ${pick}）`);
+    document.getElementById("pick-number").value = String(pick);
+  }
+  function exportJSON() {
+    const data = JSON.stringify({ songs: loadSongs() }, null, 2);
+    const blob = new Blob([data], {type: "application/json"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "songs.json"; a.click();
+    URL.revokeObjectURL(url);
+  }
+  function importJSONFile(evt) {
+    const file = evt.target.files && evt.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(String(reader.result || "{}"));
+        let arr = [];
+        if (Array.isArray(data)) arr = data.map(String);
+        else if (data && Array.isArray(data.songs)) arr = data.songs.map(String);
+        else { alert('JSON 格式不正确：应为 {"songs":[...]} 或 [...].'); return; }
+        setLocal(KEY_SONGS, arr); // saveSongs 会做归一化与渲染
+        saveSongs(arr);
+      } catch (e) {
+        alert("导入失败：" + e);
+      } finally {
+        evt.target.value = "";
+      }
+    };
+    reader.readAsText(file, "utf-8");
+  }
+
+  // ---- 绑定 & 初始化 ----
+  function bind() {
+    document.getElementById("btn-open").addEventListener("click", openBoxByNumber);
+    document.getElementById("btn-random").addEventListener("click", openRandom);
+    document.getElementById("btn-shuffle").addEventListener("click", reshuffleMapping);
+    document.getElementById("btn-add-single").addEventListener("click", addSingle);
+    document.getElementById("btn-add-bulk").addEventListener("click", addBulk);
+    document.getElementById("btn-delete").addEventListener("click", deleteSelected);
+    document.getElementById("btn-export").addEventListener("click", exportJSON);
+    document.getElementById("import-file").addEventListener("change", importJSONFile);
+  }
+  function init() {
+    // 首次渲染
+    const normed = loadSongs(); setLocal(KEY_SONGS, normed);
+    renderSongCount(); renderDeleteList(); fixOrReshuffleMapping(); renderMeta(); bind();
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
+})();
 </script>
 </body>
 </html>
