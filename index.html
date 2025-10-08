@@ -40,8 +40,7 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>🎵 盲盒歌单（纯浏览器版）</h1>
-  <div class="muted">在手机/平板/电脑的浏览器中直接运行。添加/删除歌曲，编号 1..N 开盲盒；每次洗牌都会打乱编号→歌名映射。数据仅保存在本机浏览器。</div>
+  <h1>🎵 盲盒歌单</h1>
 
   <!-- 歌曲池与控制 -->
   <div class="card">
@@ -90,34 +89,34 @@
     <button id="btn-delete" type="button" class="warn">删除所选</button>
   </div>
 
-  <!-- 导入 / 导出 -->
-  <div class="row row-2">
-    <div class="card">
-      <label>导出 JSON</label>
-      <button id="btn-export" type="button" class="secondary">导出 songs.json</button>
-      <div class="spacer"></div>
-      <div class="muted">格式：<span class="kbd">{&quot;songs&quot;: [&quot;歌名1&quot;, ...]}</span> 或 <span class="kbd">[&quot;歌名1&quot;, ...]</span></div>
-    </div>
-    <div class="card">
-      <label for="import-file">导入 JSON</label>
-      <input id="import-file" type="file" accept="application/json" />
-      <div class="spacer"></div>
-      <div class="muted">导入会覆盖当前歌单（会自动转换为不重复列表）。</div>
-    </div>
-  </div>
+<!--  &lt;!&ndash; 导入 / 导出 &ndash;&gt;-->
+<!--  <div class="row row-2">-->
+<!--    <div class="card">-->
+<!--      <label>导出 JSON</label>-->
+<!--      <button id="btn-export" type="button" class="secondary">导出 songs.json</button>-->
+<!--      <div class="spacer"></div>-->
+<!--      <div class="muted">格式：<span class="kbd">{&quot;songs&quot;: [&quot;歌名1&quot;, ...]}</span> 或 <span class="kbd">[&quot;歌名1&quot;, ...]</span></div>-->
+<!--    </div>-->
+<!--    <div class="card">-->
+<!--      <label for="import-file">导入 JSON</label>-->
+<!--      <input id="import-file" type="file" accept="application/json" />-->
+<!--      <div class="spacer"></div>-->
+<!--      <div class="muted">导入会覆盖当前歌单（会自动转换为不重复列表）。</div>-->
+<!--    </div>-->
+<!--  </div>-->
 
-  <div class="card">
-    <details>
-      <summary>使用说明</summary>
-      <div class="hr"></div>
-      <ul>
-        <li>点击“重新洗牌”会随机打乱 <b>数字 1..N</b> 与 <b>歌名</b> 的对应关系，并记录时间。</li>
-        <li>输入数字开盲盒；或点“随机抽一首”。</li>
-        <li>数据保存在本机浏览器的 <code>localStorage</code>，也可导入/导出 JSON 文件。</li>
-      </ul>
-    </details>
-  </div>
-</div>
+<!--  <div class="card">-->
+<!--    <details>-->
+<!--      <summary>使用说明</summary>-->
+<!--      <div class="hr"></div>-->
+<!--      <ul>-->
+<!--        <li>点击“重新洗牌”会随机打乱 <b>数字 1..N</b> 与 <b>歌名</b> 的对应关系，并记录时间。</li>-->
+<!--        <li>输入数字开盲盒；或点“随机抽一首”。</li>-->
+<!--        <li>数据保存在本机浏览器的 <code>localStorage</code>，也可导入/导出 JSON 文件。</li>-->
+<!--      </ul>-->
+<!--    </details>-->
+<!--  </div>-->
+<!--</div>-->
 
 <script>
 (function () {
@@ -128,8 +127,6 @@
   const KEY_MAP   = "blindbox_mapping";
   const KEY_TIME  = "blindbox_last_shuffle";
 
-  // 可选：首次打开时预置一些歌（不需要可设为空数组）
-  const DEFAULT_SONGS = [];
 
   // ---- 工具 ----
   function getLocal(key, defVal) {
