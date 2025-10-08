@@ -4,21 +4,16 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>盲盒歌单（纯浏览器版·PyScript）</title>
-  <!-- PyScript（首次需联网加载，之后走缓存） -->
   <link rel="stylesheet" href="https://pyscript.net/latest/pyscript.css" />
   <script defer src="https://pyscript.net/latest/pyscript.js"></script>
   <style>
     :root { --gap: 12px; --radius: 14px; }
-    body {
-      font-family: system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
-      margin: 0; background: #0f172a; color: #e2e8f0;
-    }
+    body { font-family: system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+           margin: 0; background: #0f172a; color: #e2e8f0; }
     .wrap { max-width: 840px; margin: 0 auto; padding: 20px 14px 80px; }
     h1 { font-size: 22px; margin: 8px 0 10px; }
-    .card {
-      background: #111827; border: 1px solid #1f2937; border-radius: var(--radius);
-      padding: 14px; margin-top: var(--gap);
-    }
+    .card { background: #111827; border: 1px solid #1f2937; border-radius: var(--radius);
+            padding: 14px; margin-top: var(--gap); }
     label { font-size: 14px; opacity: .9; margin-bottom: 6px; display: block; }
     input[type="text"], input[type="number"], textarea, select {
       width: 100%; background: #0b1220; color: #e2e8f0; border: 1px solid #233044;
@@ -39,10 +34,8 @@
     .spacer { height: 6px; }
     .success { color:#34d399 }
     .hr { height:1px; background:#1f2937; margin: 10px 0; }
-    .kbd {
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-      background:#0b1220;border:1px solid #233044;border-radius:6px;padding:2px 6px;font-size:12px;
-    }
+    .kbd { font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;
+           background:#0b1220;border:1px solid #233044;border-radius:6px;padding:2px 6px;font-size:12px; }
     .num { font-variant-numeric: tabular-nums; }
   </style>
 </head>
@@ -64,9 +57,9 @@
         <input id="pick-number" type="number" min="1" value="1" />
       </div>
       <div class="flex">
-        <button id="btn-open">打开盲盒</button>
-        <button id="btn-random" class="secondary">随机抽一首</button>
-        <button id="btn-shuffle">重新洗牌</button>
+        <button id="btn-open" type="button" py-click="open_box_by_number()">打开盲盒</button>
+        <button id="btn-random" type="button" class="secondary" py-click="open_random()">随机抽一首</button>
+        <button id="btn-shuffle" type="button" py-click="reshuffle_mapping()">重新洗牌</button>
       </div>
     </div>
     <div class="spacer"></div>
@@ -79,7 +72,7 @@
       <label for="single-title">添加单曲</label>
       <input id="single-title" type="text" placeholder="例如：周杰伦 - 晴天" />
       <div class="spacer"></div>
-      <button id="btn-add-single">添加</button>
+      <button id="btn-add-single" type="button" py-click="add_single()">添加</button>
       <div class="spacer"></div>
       <div class="muted">会自动去重；不区分大小写。</div>
     </div>
@@ -87,7 +80,7 @@
       <label for="bulk-titles">批量添加（每行或用逗号分隔）</label>
       <textarea id="bulk-titles" placeholder="歌名A&#10;歌名B, 歌名C"></textarea>
       <div class="spacer"></div>
-      <button id="btn-add-bulk">批量添加</button>
+      <button id="btn-add-bulk" type="button" py-click="add_bulk()">批量添加</button>
     </div>
   </div>
 
@@ -95,20 +88,20 @@
     <label for="delete-select">删除歌曲（可多选）</label>
     <select id="delete-select" multiple size="8" aria-label="删除歌曲列表"></select>
     <div class="spacer"></div>
-    <button id="btn-delete" class="warn">删除所选</button>
+    <button id="btn-delete" type="button" class="warn" py-click="delete_selected()">删除所选</button>
   </div>
 
   <!-- 导入 / 导出 -->
   <div class="row row-2">
     <div class="card">
       <label>导出 JSON</label>
-      <button id="btn-export" class="secondary">导出 songs.json</button>
+      <button id="btn-export" type="button" class="secondary" py-click="export_json()">导出 songs.json</button>
       <div class="spacer"></div>
       <div class="muted">格式：<span class="kbd">{&quot;songs&quot;: [&quot;歌名1&quot;, ...]}</span> 或 <span class="kbd">[&quot;歌名1&quot;, ...]</span></div>
     </div>
     <div class="card">
       <label for="import-file">导入 JSON</label>
-      <input id="import-file" type="file" accept="application/json" />
+      <input id="import-file" type="file" accept="application/json" py-change="import_json" />
       <div class="spacer"></div>
       <div class="muted">导入会覆盖当前歌单（会自动转换为不重复列表）。</div>
     </div>
@@ -134,12 +127,11 @@ from js import document, window, Blob, URL, FileReader
 import json, random
 from datetime import datetime
 
-# ---- 本地存储键 ----
 KEY_SONGS = "blindbox_songs"
 KEY_MAP = "blindbox_mapping"
 KEY_TIME = "blindbox_last_shuffle"
 
-# ---- 可选：预置歌单（首次打开时装入；不需要可留空） ----
+# 可选：首次打开时预置一些歌（不需要可留空）
 DEFAULT_SONGS = []
 
 def _get_local(key, default=None):
@@ -156,17 +148,14 @@ def _set_local(key, pyobj):
 
 def load_songs():
     data = _get_local(KEY_SONGS, [])
-    # 首次无数据时注入预置歌单
     if not data and DEFAULT_SONGS:
         _set_local(KEY_SONGS, DEFAULT_SONGS)
         data = DEFAULT_SONGS
     uniq, seen = [], set()
     for x in data:
-        s = str(x).strip()
-        k = s.lower()
+        s = str(x).strip(); k = s.lower()
         if s and k not in seen:
-            uniq.append(s)
-            seen.add(k)
+            uniq.append(s); seen.add(k)
     return uniq
 
 def save_songs(songs):
@@ -183,19 +172,13 @@ def now_str(): return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 def reshuffle_mapping():
     n = len(load_songs())
-    mapping = list(range(n))
-    random.shuffle(mapping)
-    set_mapping(mapping)
-    set_last_shuffle(now_str())
-    render_meta()
+    mapping = list(range(n)); random.shuffle(mapping)
+    set_mapping(mapping); set_last_shuffle(now_str()); render_meta()
 
 def fix_or_reshuffle_mapping():
-    songs = load_songs()
-    mapping = get_mapping()
-    if not mapping or len(mapping) != len(songs):
-        reshuffle_mapping()
-    else:
-        render_meta()
+    songs = load_songs(); mapping = get_mapping()
+    if not mapping or len(mapping) != len(songs): reshuffle_mapping()
+    else: render_meta()
 
 def render_meta():
     document.getElementById("song-count").innerText = str(len(load_songs()))
@@ -206,105 +189,70 @@ def render_song_count():
 
 def render_delete_list():
     sel = document.getElementById("delete-select")
-    while sel.firstChild:
-        sel.removeChild(sel.firstChild)
+    while sel.firstChild: sel.removeChild(sel.firstChild)
     for i, name in enumerate(load_songs()):
-        opt = document.createElement("option")
-        opt.value = str(i)
-        opt.text = name
-        sel.appendChild(opt)
+        opt = document.createElement("option"); opt.value = str(i); opt.text = name; sel.appendChild(opt)
 
 def add_single():
     inp = document.getElementById("single-title")
     name = inp.value.strip()
-    if not name:
-        return
-    songs = load_songs()
-    keyset = set(x.lower() for x in songs)
+    if not name: return
+    songs = load_songs(); keyset = set(x.lower() for x in songs)
     if name.lower() not in keyset:
-        songs.append(name)
-        songs.sort(key=lambda s: s.lower())
-        save_songs(songs)
+        songs.append(name); songs.sort(key=lambda s: s.lower()); save_songs(songs)
     inp.value = ""
 
 def add_bulk():
-    ta = document.getElementById("bulk-titles")
-    raw = ta.value
+    ta = document.getElementById("bulk-titles"); raw = ta.value
     items = []
     for line in raw.splitlines():
         for part in line.split(","):
             s = part.strip()
-            if s:
-                items.append(s)
-    if not items:
-        return
-    songs = load_songs()
-    keyset = set(x.lower() for x in songs)
+            if s: items.append(s)
+    if not items: return
+    songs = load_songs(); keyset = set(x.lower() for x in songs)
     for s in items:
         if s.lower() not in keyset:
-            songs.append(s)
-            keyset.add(s.lower())
-    songs.sort(key=lambda s: s.lower())
-    save_songs(songs)
-    ta.value = ""
+            songs.append(s); keyset.add(s.lower())
+    songs.sort(key=lambda s: s.lower()); save_songs(songs); ta.value = ""
 
 def delete_selected():
     sel = document.getElementById("delete-select")
     idxs = sorted([int(o.value) for o in sel.selectedOptions], reverse=True)
-    if not idxs:
-        return
+    if not idxs: return
     songs = load_songs()
     for i in idxs:
-        if 0 <= i < len(songs):
-            songs.pop(i)
+        if 0 <= i < len(songs): songs.pop(i)
     save_songs(songs)
 
 def open_box_by_number():
-    res = document.getElementById("result")
-    inp = document.getElementById("pick-number")
-    try:
-        n = int(inp.value)
+    res = document.getElementById("result"); inp = document.getElementById("pick-number")
+    try: n = int(inp.value)
     except Exception:
-        res.innerText = "请输入有效的数字。"
-        return
+        res.innerText = "请输入有效的数字。"; return
     songs = load_songs()
-    if not songs:
-        res.innerText = "歌单为空。"
-        return
-    if n < 1 or n > len(songs):
-        res.innerText = "数字超出范围。"
-        return
-    fix_or_reshuffle_mapping()
-    mapping = get_mapping()
+    if not songs: res.innerText = "歌单为空。"; return
+    if n < 1 or n > len(songs): res.innerText = "数字超出范围。"; return
+    fix_or_reshuffle_mapping(); mapping = get_mapping()
     res.innerText = f"🎉 你的盲盒是：{songs[mapping[n-1]]}"
 
 def open_random():
-    res = document.getElementById("result")
-    songs = load_songs()
-    if not songs:
-        res.innerText = "歌单为空。"
-        return
-    fix_or_reshuffle_mapping()
-    mapping = get_mapping()
+    res = document.getElementById("result"); songs = load_songs()
+    if not songs: res.innerText = "歌单为空。"; return
+    fix_or_reshuffle_mapping(); mapping = get_mapping()
     pick = random.randint(1, len(songs))
     res.innerText = f"🎉 随机抽到：{songs[mapping[pick-1]]}（编号 {pick}）"
     document.getElementById("pick-number").value = str(pick)
 
 def export_json():
-    songs = load_songs()
-    data = {"songs": songs}
+    songs = load_songs(); data = {"songs": songs}
     blob = Blob.new([json.dumps(data, ensure_ascii=False, indent=2)], { "type": "application/json" })
-    url = URL.createObjectURL(blob)
-    a = document.createElement("a")
-    a.href = url
-    a.download = "songs.json"
-    a.click()
-    URL.revokeObjectURL(url)
+    url = URL.createObjectURL(blob); a = document.createElement("a")
+    a.href = url; a.download = "songs.json"; a.click(); URL.revokeObjectURL(url)
 
 def import_json(evt):
     file = evt.target.files[0] if evt.target.files.length > 0 else None
-    if not file:
-        return
+    if not file: return
     reader = FileReader.new()
     def onload(_):
         try:
@@ -314,40 +262,19 @@ def import_json(evt):
             elif isinstance(data, list):
                 songs = [str(x) for x in data]
             else:
-                window.alert("JSON 格式不正确：应为 {\"songs\":[...]} 或 [...].")
-                return
-            # 去重 & 排序
+                window.alert("JSON 格式不正确：应为 {\"songs\":[...]} 或 [...]."); return
             norm, seen = [], set()
             for s in songs:
-                s2 = s.strip()
-                k = s2.lower()
-                if s2 and k not in seen:
-                    norm.append(s2)
-                    seen.add(k)
-            norm.sort(key=lambda s: s.lower())
-            save_songs(norm)
+                s2 = s.strip(); k = s2.lower()
+                if s2 and k not in seen: norm.append(s2); seen.add(k)
+            norm.sort(key=lambda s: s.lower()); save_songs(norm)
         except Exception as e:
             window.alert(f"导入失败：{e}")
-    reader.onload = onload
-    reader.readAsText(file, "utf-8")
+    reader.onload = onload; reader.readAsText(file, "utf-8")
 
-def bind():
-    document.getElementById("btn-add-single").addEventListener("click", lambda evt: add_single())
-    document.getElementById("btn-add-bulk").addEventListener("click", lambda evt: add_bulk())
-    document.getElementById("btn-delete").addEventListener("click", lambda evt: delete_selected())
-    document.getElementById("btn-open").addEventListener("click", lambda evt: open_box_by_number())
-    document.getElementById("btn-random").addEventListener("click", lambda evt: open_random())
-    document.getElementById("btn-shuffle").addEventListener("click", lambda evt: reshuffle_mapping())
-    document.getElementById("btn-export").addEventListener("click", lambda evt: export_json())
-    document.getElementById("import-file").addEventListener("change", import_json)
-
-def render_on_load():
-    save_songs(load_songs())       # 归一化并渲染
-    fix_or_reshuffle_mapping()
-    render_delete_list()
-
-bind()
-render_on_load()
+# 初次渲染
+save_songs(load_songs())
+render_delete_list()
 </py-script>
 </body>
 </html>
