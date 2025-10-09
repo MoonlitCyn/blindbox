@@ -3,53 +3,77 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>盲盒歌单（纯浏览器版）</title>
+  <title>盲盒歌单（账号版 · Supabase）</title>
   <style>
     :root { --gap: 12px; --radius: 14px; }
     * { box-sizing: border-box; }
-    body { font-family: system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
-           margin: 0; background: #0f172a; color: #e2e8f0; }
-    .wrap { max-width: 840px; margin: 0 auto; padding: 20px 14px 80px; }
+    body { font-family: system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; margin:0; background:#0f172a; color:#e2e8f0; }
+    .wrap { max-width: 880px; margin: 0 auto; padding: 20px 14px 80px; }
     h1 { font-size: 22px; margin: 8px 0 10px; }
-    .card { background: #111827; border: 1px solid #1f2937; border-radius: var(--radius);
-            padding: 14px; margin-top: var(--gap); }
-    label { font-size: 14px; opacity: .9; margin-bottom: 6px; display: block; }
-    input[type="text"], input[type="number"], textarea, select {
-      width: 100%; background: #0b1220; color: #e2e8f0; border: 1px solid #233044;
-      border-radius: 10px; padding: 10px; outline: none;
-    }
-    textarea { min-height: 110px; resize: vertical; }
     .row { display: grid; grid-template-columns: 1fr; gap: var(--gap); }
     @media (min-width: 720px) { .row-2 { grid-template-columns: 1fr 1fr; } }
-    button {
-      background: #2563eb; color: #fff; border: none; border-radius: 10px;
-      padding: 10px 14px; font-weight: 600; cursor: pointer;
+    .card { background:#111827; border:1px solid #1f2937; border-radius:14px; padding:14px; margin-top:12px; }
+    .flex { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+    label { font-size: 14px; opacity:.9; margin-bottom:6px; display:block; }
+    input[type="text"], input[type="email"], input[type="password"], input[type="number"], textarea, select {
+      width: 100%; background:#0b1220; color:#e2e8f0; border:1px solid #233044; border-radius: 10px; padding:10px; outline:none;
     }
-    button.secondary { background: #374151; }
-    button.warn { background: #dc2626; }
-    .muted { color: #94a3b8; font-size: 13px; }
+    textarea { min-height: 110px; resize: vertical; }
+    button { background:#2563eb; color:#fff; border:none; border-radius:10px; padding:10px 14px; font-weight:600; cursor:pointer; }
+    button.secondary { background:#374151; }
+    button.warn { background:#dc2626; }
+    .muted { color:#94a3b8; font-size:13px; }
     .pill { display:inline-block;background:#0b1220;border:1px solid #233044;border-radius:999px;padding:4px 10px;font-size:12px;color:#9fb7d3 }
-    .flex { display:flex; gap: var(--gap); align-items: center; flex-wrap: wrap; }
-    .spacer { height: 6px; }
+    .spacer { height:6px; }
     .success { color:#34d399 }
-    .hr { height:1px; background:#1f2937; margin: 10px 0; }
-    .kbd { font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;
-           background:#0b1220;border:1px solid #233044;border-radius:6px;padding:2px 6px;font-size:12px; }
-    .num { font-variant-numeric: tabular-nums; }
+    .hidden { display:none !important; }
   </style>
+  <!-- Supabase JS SDK v2（CDN） -->
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 <div class="wrap">
-  <h1>🎵 盲盒歌单（纯浏览器版）</h1>
-  <div class="muted">在手机/平板/电脑的浏览器中直接运行。添加/删除歌曲，编号 1..N 开盲盒；每次洗牌都会打乱编号→歌名映射。数据仅保存在本机浏览器。</div>
+  <h1>🎵 盲盒歌单（账号版）</h1>
 
-  <!-- 歌曲池与控制 -->
+  <!-- 登录区 -->
   <div class="card">
-    <div class="flex">
-      <div class="pill">歌曲数：<span id="song-count" class="num">0</span></div>
-      <div class="pill">最近洗牌：<span id="last-shuffle" class="num">—</span></div>
+    <div class="row row-2">
+      <div>
+        <label for="email">邮箱</label>
+        <input id="email" type="email" placeholder="user@example.com" />
+      </div>
+      <div>
+        <label for="password">密码</label>
+        <input id="password" type="password" placeholder="••••••••" />
+      </div>
     </div>
     <div class="spacer"></div>
+    <div class="flex">
+      <button id="btn-login" type="button">登录</button>
+      <button id="btn-logout" type="button" class="secondary">登出</button>
+      <div class="muted" id="auth-info">未登录</div>
+    </div>
+
+    <!-- 管理员专用：切换被管理的用户 -->
+    <div id="admin-panel" class="hidden">
+      <div class="spacer"></div>
+      <label for="user-select">切换用户（管理员代为管理）</label>
+      <select id="user-select"></select>
+    </div>
+  </div>
+
+  <!-- 信息条 -->
+  <div class="card">
+    <div class="flex">
+      <div class="pill">歌曲数：<span id="song-count">0</span></div>
+      <div class="pill">最近洗牌：<span id="last-shuffle">—</span></div>
+      <div class="pill">当前身份：<span id="role-badge">访客</span></div>
+    </div>
+    <div id="result" class="success"></div>
+  </div>
+
+  <!-- 盲盒操作（所有登录用户可见） -->
+  <div class="card">
     <div class="row row-2">
       <div>
         <label for="pick-number">输入一个数字（1..N）开盲盒</label>
@@ -59,295 +83,258 @@
         <button id="btn-open" type="button">打开盲盒</button>
         <button id="btn-random" type="button" class="secondary">随机抽一首</button>
         <button id="btn-shuffle" type="button">重新洗牌</button>
+        <button id="btn-sync" type="button" class="secondary">从云端刷新</button>
       </div>
     </div>
+  </div>
+
+  <!-- 编辑区：管理员 & 本人可见（如果你想让普通用户完全不能编辑，把 refreshVisibility 里条件改成仅 isAdmin()） -->
+  <div id="edit-section" class="card hidden">
+    <div class="row row-2">
+      <div>
+        <label for="single-title">添加单曲</label>
+        <input id="single-title" type="text" placeholder="例如：周杰伦 - 晴天" />
+        <div class="spacer"></div>
+        <button id="btn-add-single" type="button">添加</button>
+        <div class="muted">自动去重；不区分大小写。</div>
+      </div>
+      <div>
+        <label for="bulk-titles">批量添加（每行或用逗号分隔）</label>
+        <textarea id="bulk-titles" placeholder="歌名A&#10;歌名B, 歌名C"></textarea>
+        <div class="spacer"></div>
+        <button id="btn-add-bulk" type="button">批量添加</button>
+      </div>
+    </div>
+
     <div class="spacer"></div>
-    <div id="result" class="success"></div>
-  </div>
-
-  <!-- 添加/删除 -->
-  <div class="row row-2">
-    <div class="card">
-      <label for="single-title">添加单曲</label>
-      <input id="single-title" type="text" placeholder="例如：周杰伦 - 晴天" />
-      <div class="spacer"></div>
-      <button id="btn-add-single" type="button">添加</button>
-      <div class="spacer"></div>
-      <div class="muted">会自动去重；不区分大小写。</div>
-    </div>
-    <div class="card">
-      <label for="bulk-titles">批量添加（每行或用逗号分隔）</label>
-      <textarea id="bulk-titles" placeholder="歌名A&#10;歌名B, 歌名C"></textarea>
-      <div class="spacer"></div>
-      <button id="btn-add-bulk" type="button">批量添加</button>
-    </div>
-  </div>
-
-  <div class="card">
     <label for="delete-select">删除歌曲（可多选）</label>
-    <select id="delete-select" multiple size="8" aria-label="删除歌曲列表"></select>
+    <select id="delete-select" multiple size="8"></select>
     <div class="spacer"></div>
     <button id="btn-delete" type="button" class="warn">删除所选</button>
-  </div>
 
-  <!-- 导入 / 导出 -->
-  <div class="row row-2">
-    <div class="card">
-      <label>导出 JSON</label>
-      <button id="btn-export" type="button" class="secondary">导出 songs.json</button>
-      <div class="spacer"></div>
-      <div class="muted">格式：<span class="kbd">{&quot;songs&quot;: [&quot;歌名1&quot;, ...]}</span> 或 <span class="kbd">[&quot;歌名1&quot;, ...]</span></div>
+    <div class="row row-2">
+      <div>
+        <label>导出 JSON</label>
+        <button id="btn-export" type="button" class="secondary">导出 songs.json</button>
+      </div>
+      <div>
+        <label for="import-file">导入 JSON</label>
+        <input id="import-file" type="file" accept="application/json" />
+      </div>
     </div>
-    <div class="card">
-      <label for="import-file">导入 JSON</label>
-      <input id="import-file" type="file" accept="application/json" />
-      <div class="spacer"></div>
-      <div class="muted">导入会覆盖当前歌单（会自动转换为不重复列表）。</div>
-    </div>
-  </div>
-
-  <div class="card">
-    <details>
-      <summary>使用说明</summary>
-      <div class="hr"></div>
-      <ul>
-        <li>点击“重新洗牌”会随机打乱 <b>数字 1..N</b> 与 <b>歌名</b> 的对应关系，并记录时间。</li>
-        <li>输入数字开盲盒；或点“随机抽一首”。</li>
-        <li>数据保存在本机浏览器的 <code>localStorage</code>，也可导入/导出 JSON 文件。</li>
-      </ul>
-    </details>
   </div>
 </div>
 
 <script>
-(function () {
+(async () => {
   "use strict";
 
-  // ---- 本地存储键 ----
-  const KEY_SONGS = "blindbox_songs";
-  const KEY_MAP   = "blindbox_mapping";
-  const KEY_TIME  = "blindbox_last_shuffle";
+  // === 在此粘贴你的项目信息（必填） ===
+  const SUPABASE_URL = 'https://steopnqdsgfrofwkvwnv.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN0ZW9wbnFkc2dmcm9md2t2d252Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4MTYzOTYsImV4cCI6MjA3NTM5MjM5Nn0.TOJulORFvVr2eX0qLO287x9kjn3wvqAjK68WC2eISFU';
+  const ADMIN_UID = '6ad49ae6-827c-4c8b-b9cd-8aa5c4034221';
 
-  // 可选：首次打开时预置一些歌（不需要可设为空数组）
-  const DEFAULT_SONGS = [];
+  // Supabase init
+  const { createClient } = window.supabase;
+  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-  // ---- 工具 ----
-  function getLocal(key, defVal) {
-    try {
-      const v = localStorage.getItem(key);
-      return v == null ? defVal : JSON.parse(v);
-    } catch {
-      return defVal;
-    }
-  }
-  function setLocal(key, val) {
-    localStorage.setItem(key, JSON.stringify(val));
-  }
-  function nowStr() {
-    const d = new Date();
-    const pad = n => String(n).padStart(2, "0");
-    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-  }
+  // 状态
+  let currentUser = null;     // 当前登录者 { id, email }
+  let actingUserId = null;    // 正在操作的用户（管理员可切换）
+  let songs = [];             // 歌单
+  let mapping = [];           // 映射
+  let lastShuffle = null;
 
-  // ---- 数据层 ----
-  function loadSongs() {
-    let data = getLocal(KEY_SONGS, []);
-    if ((!data || data.length === 0) && DEFAULT_SONGS.length) {
-      setLocal(KEY_SONGS, DEFAULT_SONGS);
-      data = DEFAULT_SONGS;
-    }
-    const uniq = [];
-    const seen = new Set();
-    for (const x of data) {
-      const s = String(x).trim();
-      const k = s.toLowerCase();
-      if (s && !seen.has(k)) { uniq.push(s); seen.add(k); }
-    }
-    return uniq;
-  }
-  function saveSongs(songs) {
-    setLocal(KEY_SONGS, songs);
-    renderSongCount();
-    renderDeleteList();
-    fixOrReshuffleMapping();
-  }
+  // DOM 快捷
+  const $ = id => document.getElementById(id);
+  const setText = (id, v) => $(id).textContent = v;
+  const showResult = msg => setText('result', msg);
 
-  function getMapping() { return getLocal(KEY_MAP, []); }
-  function setMapping(m) { setLocal(KEY_MAP, m); }
-  function getLastShuffle() { return getLocal(KEY_TIME, null); }
-  function setLastShuffle(s) { setLocal(KEY_TIME, s); }
+  // 身份/可见性
+  const isAdmin = () => currentUser && currentUser.id === ADMIN_UID;
+  const refreshVisibility = () => {
+    setText('role-badge', isAdmin() ? '管理员' : currentUser ? '用户' : '访客');
+    const editingOwn = currentUser && actingUserId === currentUser.id;
+    const showEdit = isAdmin() || editingOwn; // 若想禁用普通用户编辑：改成 const showEdit = isAdmin();
+    $('edit-section').classList.toggle('hidden', !showEdit);
+    $('admin-panel').classList.toggle('hidden', !isAdmin());
+  };
 
-  // ---- 逻辑 ----
-  function reshuffleMapping() {
-    const n = loadSongs().length;
-    const mapping = Array.from({length: n}, (_, i) => i);
-    for (let i = n - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [mapping[i], mapping[j]] = [mapping[j], mapping[i]];
-    }
-    setMapping(mapping);
-    setLastShuffle(nowStr());
-    renderMeta();
-  }
-
-  function fixOrReshuffleMapping() {
-    const songs = loadSongs();
-    const mapping = getMapping();
-    if (!mapping || mapping.length !== songs.length) reshuffleMapping();
-    else renderMeta();
-  }
-
-  // ---- 渲染 ----
+  // 渲染
   function renderMeta() {
-    document.getElementById("song-count").innerText = String(loadSongs().length);
-    document.getElementById("last-shuffle").innerText = getLastShuffle() || "—";
-  }
-  function renderSongCount() {
-    document.getElementById("song-count").innerText = String(loadSongs().length);
+    setText('song-count', String(songs.length));
+    setText('last-shuffle', lastShuffle ? new Date(lastShuffle).toLocaleString() : '—');
   }
   function renderDeleteList() {
-    const sel = document.getElementById("delete-select");
-    while (sel.firstChild) sel.removeChild(sel.firstChild);
-    loadSongs().forEach((name, i) => {
-      const opt = document.createElement("option");
-      opt.value = String(i);
-      opt.textContent = name;
-      sel.appendChild(opt);
+    const sel = $('delete-select'); sel.innerHTML = '';
+    songs.forEach((name, i) => {
+      const opt = document.createElement('option');
+      opt.value = String(i); opt.textContent = name; sel.appendChild(opt);
     });
   }
 
-  // ---- 交互 ----
-  function addSingle() {
-    const inp = document.getElementById("single-title");
-    const name = (inp.value || "").trim();
-    if (!name) return;
-    const songs = loadSongs();
-    const set = new Set(songs.map(s => s.toLowerCase()));
+  // 取/存云端
+  async function fetchOrCreatePlaylist(userId) {
+    const { data, error } = await supabase
+      .from('playlists')
+      .select('songs, mapping, last_shuffle')
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (error && error.code !== 'PGRST116') throw error;
+    if (!data) {
+      const payload = { user_id: userId, songs: [], mapping: [], last_shuffle: null };
+      const { error: insErr } = await supabase.from('playlists').insert(payload);
+      if (insErr) throw insErr;
+      return payload;
+    }
+    return data;
+  }
+  async function savePlaylist(userId, nextSongs, nextMapping, nextLastShuffle) {
+    const payload = {
+      songs: nextSongs, mapping: nextMapping,
+      last_shuffle: nextLastShuffle || null, updated_at: new Date().toISOString()
+    };
+    const { error } = await supabase.from('playlists').update(payload).eq('user_id', userId);
+    if (error) throw error;
+  }
+
+  // 管理员：构建用户下拉（基于 playlists 中已有记录）
+  async function buildAdminUserList() {
+    const { data, error } = await supabase.from('playlists').select('user_id');
+    if (error) throw error;
+    const ids = Array.from(new Set((data||[]).map(r => r.user_id)));
+    const sel = $('user-select'); sel.innerHTML = '';
+    const me = document.createElement('option');
+    me.value = currentUser.id; me.textContent = `自己 (${currentUser.id.slice(0,8)}…)`;
+    sel.appendChild(me);
+    for (const id of ids) {
+      if (id === currentUser.id) continue;
+      const opt = document.createElement('option');
+      opt.value = id; opt.textContent = id; sel.appendChild(opt);
+    }
+    actingUserId = sel.value;
+  }
+
+  // 洗牌与映射
+  function reshuffle() {
+    const n = songs.length;
+    mapping = Array.from({length:n}, (_,i)=>i);
+    for (let i=n-1;i>0;i--) { const j = Math.floor(Math.random()*(i+1)); [mapping[i],mapping[j]]=[mapping[j],mapping[i]]; }
+    lastShuffle = new Date().toISOString();
+    renderMeta();
+  }
+  function ensureMapping() {
+    if (!mapping || mapping.length !== songs.length) reshuffle(); else renderMeta();
+  }
+
+  // 操作
+  async function openByNumber() {
+    const n = parseInt($('pick-number').value,10);
+    if (!songs.length) { showResult('歌单为空。'); return; }
+    if (!Number.isInteger(n) || n<1 || n>songs.length) { showResult('数字超出范围。'); return; }
+    ensureMapping(); showResult(`🎉 你的盲盒是：${songs[mapping[n-1]]}`);
+  }
+  async function openRandom() {
+    if (!songs.length) { showResult('歌单为空。'); return; }
+    ensureMapping();
+    const pick = Math.floor(Math.random()*songs.length)+1;
+    showResult(`🎉 随机抽到：${songs[mapping[pick-1]]}（编号 ${pick}）`);
+    $('pick-number').value = String(pick);
+  }
+  async function doShuffle() { reshuffle(); await savePlaylist(actingUserId, songs, mapping, lastShuffle); }
+  async function addSingle() {
+    const name = ($('single-title').value||'').trim(); if (!name) return;
+    const set = new Set(songs.map(s=>s.toLowerCase()));
     if (!set.has(name.toLowerCase())) {
-      songs.push(name);
-      songs.sort((a,b) => a.toLowerCase().localeCompare(b.toLowerCase()));
-      saveSongs(songs);
+      songs.push(name); songs.sort((a,b)=>a.toLowerCase().localeCompare(b.toLowerCase()));
+      ensureMapping(); await savePlaylist(actingUserId, songs, mapping, lastShuffle); renderDeleteList();
     }
-    inp.value = "";
+    $('single-title').value = '';
   }
-
-  function addBulk() {
-    const ta = document.getElementById("bulk-titles");
-    const raw = ta.value || "";
-    const parts = raw.split(/\n|,/).map(s => s.trim()).filter(Boolean);
-    if (parts.length === 0) return;
-    const songs = loadSongs();
-    const set = new Set(songs.map(s => s.toLowerCase()));
-    for (const s of parts) {
-      if (!set.has(s.toLowerCase())) {
-        songs.push(s);
-        set.add(s.toLowerCase());
-      }
-    }
-    songs.sort((a,b) => a.toLowerCase().localeCompare(b.toLowerCase()));
-    saveSongs(songs);
-    ta.value = "";
+  async function addBulk() {
+    const raw = $('bulk-titles').value||''; const parts = raw.split(/\n|,/).map(s=>s.trim()).filter(Boolean);
+    if (!parts.length) return;
+    const set = new Set(songs.map(s=>s.toLowerCase()));
+    for (const s of parts) if (!set.has(s.toLowerCase())) { songs.push(s); set.add(s.toLowerCase()); }
+    songs.sort((a,b)=>a.toLowerCase().localeCompare(b.toLowerCase()));
+    ensureMapping(); await savePlaylist(actingUserId, songs, mapping, lastShuffle); renderDeleteList();
+    $('bulk-titles').value = '';
   }
-
-  function deleteSelected() {
-    const sel = document.getElementById("delete-select");
-    const idxs = Array.from(sel.selectedOptions).map(o => parseInt(o.value, 10)).sort((a,b)=>b-a);
-    if (idxs.length === 0) return;
-    const songs = loadSongs();
-    for (const i of idxs) {
-      if (i >=0 && i < songs.length) songs.splice(i, 1);
-    }
-    saveSongs(songs);
+  async function delSelected() {
+    const sel = $('delete-select');
+    const idxs = Array.from(sel.selectedOptions).map(o=>parseInt(o.value,10)).sort((a,b)=>b-a);
+    if (!idxs.length) return;
+    for (const i of idxs) if (i>=0 && i<songs.length) songs.splice(i,1);
+    ensureMapping(); await savePlaylist(actingUserId, songs, mapping, lastShuffle); renderDeleteList();
   }
-
-  function openBoxByNumber() {
-    const res = document.getElementById("result");
-    const val = document.getElementById("pick-number").value;
-    const n = parseInt(val, 10);
-    const songs = loadSongs();
-    if (!songs.length) { res.textContent = "歌单为空。"; return; }
-    if (!Number.isInteger(n) || n < 1 || n > songs.length) { res.textContent = "数字超出范围。"; return; }
-    fixOrReshuffleMapping();
-    const mapping = getMapping();
-    res.textContent = `🎉 你的盲盒是：${songs[mapping[n-1]]}`;
-  }
-
-  function openRandom() {
-    const res = document.getElementById("result");
-    const songs = loadSongs();
-    if (!songs.length) { res.textContent = "歌单为空。"; return; }
-    fixOrReshuffleMapping();
-    const mapping = getMapping();
-    const pick = Math.floor(Math.random() * songs.length) + 1;
-    res.textContent = `🎉 随机抽到：${songs[mapping[pick-1]]}（编号 ${pick}）`;
-    document.getElementById("pick-number").value = String(pick);
-  }
-
   function exportJSON() {
-    const songs = loadSongs();
     const data = JSON.stringify({ songs }, null, 2);
-    const blob = new Blob([data], {type: "application/json"});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = "songs.json"; a.click();
-    URL.revokeObjectURL(url);
+    const blob = new Blob([data], {type:'application/json'}); const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'songs.json'; a.click(); URL.revokeObjectURL(url);
   }
-
-  function importJSONFile(evt) {
-    const file = evt.target.files && evt.target.files[0];
-    if (!file) return;
+  async function importJSONFile(evt) {
+    const file = evt.target.files && evt.target.files[0]; if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
       try {
-        const data = JSON.parse(String(reader.result || "{}"));
-        let arr = [];
-        if (Array.isArray(data)) arr = data.map(String);
+        const data = JSON.parse(String(reader.result||"{}"));
+        let arr = []; if (Array.isArray(data)) arr = data.map(String);
         else if (data && Array.isArray(data.songs)) arr = data.songs.map(String);
         else { alert('JSON 格式不正确：应为 {"songs":[...]} 或 [...].'); return; }
         // 去重 + 排序
-        const uniq = [];
-        const seen = new Set();
-        for (const s of arr) {
-          const x = (s || "").trim();
-          const k = x.toLowerCase();
-          if (x && !seen.has(k)) { uniq.push(x); seen.add(k); }
-        }
+        const uniq = []; const seen = new Set();
+        for (const s of arr) { const t=(s||'').trim(), k=t.toLowerCase(); if (t && !seen.has(k)) { uniq.push(t); seen.add(k); } }
         uniq.sort((a,b)=>a.toLowerCase().localeCompare(b.toLowerCase()));
-        saveSongs(uniq);
-      } catch (e) {
-        alert("导入失败：" + e);
-      } finally {
-        evt.target.value = ""; // 允许重复导入同一文件
-      }
+        songs = uniq; ensureMapping(); await savePlaylist(actingUserId, songs, mapping, lastShuffle); renderDeleteList();
+      } catch (e) { alert('导入失败：' + e); }
+      finally { evt.target.value = ''; }
     };
-    reader.readAsText(file, "utf-8");
+    reader.readAsText(file, 'utf-8');
+  }
+  async function syncFromCloud() {
+    const data = await fetchOrCreatePlaylist(actingUserId);
+    songs = (data.songs||[]).map(String); mapping = Array.isArray(data.mapping)?data.mapping:[]; lastShuffle = data.last_shuffle;
+    renderMeta(); renderDeleteList();
   }
 
-  // ---- 绑定事件 ----
-  function bind() {
-    document.getElementById("btn-open").addEventListener("click", openBoxByNumber);
-    document.getElementById("btn-random").addEventListener("click", openRandom);
-    document.getElementById("btn-shuffle").addEventListener("click", reshuffleMapping);
-    document.getElementById("btn-add-single").addEventListener("click", addSingle);
-    document.getElementById("btn-add-bulk").addEventListener("click", addBulk);
-    document.getElementById("btn-delete").addEventListener("click", deleteSelected);
-    document.getElementById("btn-export").addEventListener("click", exportJSON);
-    document.getElementById("import-file").addEventListener("change", importJSONFile);
+  // 登录/登出
+  async function login() {
+    const email = $('email').value.trim(); const password = $('password').value;
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) { alert('登录失败：' + error.message); return; }
+    currentUser = data.user; actingUserId = currentUser.id;
+    setText('auth-info', `已登录：${currentUser.email}`); if (isAdmin()) { $('admin-panel').classList.remove('hidden'); await buildAdminUserList(); }
+    refreshVisibility(); await syncFromCloud();
   }
-
-  // ---- 初始化 ----
-  function init() {
-    saveSongs(loadSongs()); // 归一化并渲染
-    fixOrReshuffleMapping();
-    renderDeleteList();
-    bind();
+  async function logout() {
+    await supabase.auth.signOut(); currentUser=null; actingUserId=null; songs=[]; mapping=[]; lastShuffle=null;
+    setText('auth-info','未登录'); refreshVisibility(); renderMeta(); renderDeleteList(); showResult('');
   }
+  async function onSelectUser() { if (!isAdmin()) return; actingUserId = $('user-select').value; await syncFromCloud(); refreshVisibility(); }
 
-  // 等 DOM 就绪
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", init);
+  // 绑定
+  $('btn-login').addEventListener('click', login);
+  $('btn-logout').addEventListener('click', logout);
+  $('btn-open').addEventListener('click', openByNumber);
+  $('btn-random').addEventListener('click', openRandom);
+  $('btn-shuffle').addEventListener('click', () => doShuffle());
+  $('btn-sync').addEventListener('click', syncFromCloud);
+
+  $('btn-add-single').addEventListener('click', addSingle);
+  $('btn-add-bulk').addEventListener('click', addBulk);
+  $('btn-delete').addEventListener('click', delSelected);
+  $('btn-export').addEventListener('click', exportJSON);
+  $('import-file').addEventListener('change', importJSONFile);
+  $('user-select').addEventListener('change', onSelectUser);
+
+  // 恢复会话
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session?.user) {
+    currentUser = session.user; actingUserId = currentUser.id;
+    setText('auth-info', `已登录：${currentUser.email}`); if (isAdmin()) { $('admin-panel').classList.remove('hidden'); await buildAdminUserList(); }
+    refreshVisibility(); await syncFromCloud();
   } else {
-    init();
+    refreshVisibility();
   }
 })();
 </script>
